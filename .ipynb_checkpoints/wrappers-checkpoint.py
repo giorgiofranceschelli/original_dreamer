@@ -40,7 +40,7 @@ class ProcGen:
 
     def step(self, action):
         total_reward = 0.0
-        for _ in range(self._action_repeat):
+        for step in range(self._action_repeat):
             obs, reward, done, info = self._env.step(action)
             total_reward += reward
             if done:

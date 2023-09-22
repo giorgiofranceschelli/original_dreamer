@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers as tfkl
 from tensorflow_probability import distributions as tfd
-from tensorflow.keras.mixed_precision import global_policy
+from tensorflow.python.keras.mixed_precision.policy import global_policy
 
 import tools
 

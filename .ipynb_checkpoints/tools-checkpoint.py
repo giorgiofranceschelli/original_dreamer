@@ -10,7 +10,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.compat.v1 as tf1
 import tensorflow_probability as tfp
-from tensorflow.keras.mixed_precision import global_policy, LossScaleOptimizer
+from tensorflow.python.keras.mixed_precision.policy import global_policy
+from tensorflow.keras.mixed_precision import LossScaleOptimizer
 from tensorflow_probability import distributions as tfd
 
 
@@ -89,7 +90,7 @@ def encode_gif(frames, fps):
         f'-r {fps:.02f} -f gif -'])
     proc = Popen(cmd.split(' '), stdin=PIPE, stdout=PIPE, stderr=PIPE)
     for image in frames:
-        proc.stdin.write(image.tobytes())
+        proc.stdin.write(image.tostring())
     out, err = proc.communicate()
     if proc.returncode:
         raise IOError('\n'.join([' '.join(cmd), err.decode('utf8')]))
@@ -101,7 +102,7 @@ def simulate(agent, envs, steps=0, episodes=0, state=None):
     # Initialize or unpack simulation state.
     if state is None:
         step, episode = 0, 0
-        done = np.ones(len(envs), bool)
+        done = np.ones(len(envs), np.bool)
         length = np.zeros(len(envs), np.int32)
         obs = [None] * len(envs)
         agent_state = None
@@ -176,7 +177,7 @@ def load_episodes(directory, rescan, length=None, balance=False, seed=0):
                 total = len(next(iter(episode.values())))
                 available = total - length
                 if available < 1:
-                    # print(f'Skipped short episode of length {available}.')
+                    print(f'Skipped short episode of length {available}.')
                     continue
                 if balance:
                     index = min(random.randint(0, total), available)

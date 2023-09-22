@@ -12,7 +12,7 @@ os.environ['MUJOCO_GL'] = 'egl'
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.mixed_precision import global_policy, set_global_policy, Policy
+from tensorflow.python.keras.mixed_precision.policy import global_policy, set_global_policy, Policy
 
 tf.get_logger().setLevel('ERROR')
 
@@ -105,7 +105,8 @@ class Dreamer(tools.Module):
         self._float = global_policy().compute_dtype
         self._strategy = tf.distribute.MirroredStrategy()
         with self._strategy.scope():
-            self._dataset = iter(self._strategy.experimental_distribute_dataset(load_dataset(datadir, self._c)))
+            self._dataset = iter(self._strategy.experimental_distribute_dataset(
+                load_dataset(datadir, self._c)))
             self._build_model()
 
     def __call__(self, obs, reset, state=None, training=True):
@@ -187,13 +188,11 @@ class Dreamer(tools.Module):
             value = self._value(imag_feat).mode()
             returns = tools.lambda_return(reward[:-1], value[:-1], pcont[:-1], bootstrap=value[-1], lambda_=self._c.disclam, axis=0)
             discount = tf.stop_gradient(tf.math.cumprod(tf.concat([tf.ones_like(pcont[:1]), pcont[:-2]], 0), 0))
-            if self._c.actor_grad == 'reinforce':
-                policy = self._actor(tf.stop_gradient(imag_feat[:-2]))
-                baseline = self._value(imag_feat[:-2]).mode()
+            if self.config.actor_grad == 'reinforce':
+                baseline = self._target_critic(imag_feat[:-2]).mode()
                 advantage = tf.stop_gradient(returns[1:] - baseline)
                 action = tf.stop_gradient(actions[1:-1])
-                objective = policy.log_prob(action) * advantage
-                actor_loss = -tf.reduce_mean(objective)
+                actor_loss = self._actor.log_prob(action) * advantage
             else:
                 actor_loss = -tf.reduce_mean(discount * returns)
             actor_loss /= float(self._strategy.num_replicas_in_sync)
@@ -240,8 +239,6 @@ class Dreamer(tools.Module):
         self.train(next(self._dataset))
 
     def _exploration(self, action, training):
-        if self._c.task.startswith('procgen'):
-            return action
         if training:
             amount = self._c.expl_amount
             if self._c.expl_decay:
@@ -269,11 +266,11 @@ class Dreamer(tools.Module):
         start = {k: flatten(v) for k, v in post.items()}
         policy = lambda state: self._actor(tf.stop_gradient(self._dynamics.get_feat(state))).sample()
         def img_step(prev):
-            action = policy(prev[0])
-            return self._dynamics.img_step(prev[0], action), action
-        states, actions = tools.static_scan(lambda prev, _: img_step(prev), tf.range(self._c.horizon), (start, tf.zeros((), tf.float32)))
+            action = policy(prev)
+            return self._dynamics.img_step(prev, action), action
+        states = tools.static_scan(lambda prev, _: img_step(prev), tf.range(self._c.horizon), (start, tf.zeros((), tf.float32)))
         imag_feat = self._dynamics.get_feat(states)
-        return imag_feat, actions
+        return imag_feat
 
     def _scalar_summaries(self, data, feat, prior_dist, post_dist, likes, div, model_loss, value_loss, actor_loss, model_norm, value_norm, actor_norm):
         self._metrics['model_grad_norm'].update_state(model_norm)
@@ -370,7 +367,6 @@ def make_env(config, writer, prefix, datadir, store):
         env = wrappers.OneHotAction(env)
     elif suite == 'procgen':
         env = wrappers.ProcGen(task, config.action_repeat, num_levels=200 if prefix == 'train' else 0, distribution_mode=config.mode, seed=config.seed)
-        env = wrappers.OneHotAction(env)
     else:
         raise NotImplementedError(suite)
     env = wrappers.TimeLimit(env, config.time_limit / config.action_repeat)
@@ -420,7 +416,8 @@ def main(config):
     state = None
     while step < config.steps:
         print('Start evaluation.')
-        tools.simulate(functools.partial(agent, training=False), test_envs, episodes=1)
+        tools.simulate(
+            functools.partial(agent, training=False), test_envs, episodes=1)
         writer.flush()
         print('Start collection.')
         steps = config.eval_every // config.action_repeat
