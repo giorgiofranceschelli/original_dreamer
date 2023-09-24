@@ -193,7 +193,8 @@ class Dreamer(tools.Module):
                 advantage = tf.stop_gradient(returns[1:] - baseline)
                 action = tf.stop_gradient(actions[1:-1])
                 objective = policy.log_prob(action) * advantage
-                actor_loss = -tf.reduce_mean(objective)
+                entropy = policy.entropy()
+                actor_loss = -tf.reduce_mean(objective + 0.001*entropy)
             else:
                 actor_loss = -tf.reduce_mean(discount * returns)
             actor_loss /= float(self._strategy.num_replicas_in_sync)

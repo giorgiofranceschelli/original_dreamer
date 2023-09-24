@@ -285,6 +285,9 @@ class OneHotDist:
 
     def _one_hot(self, indices):
         return tf.one_hot(indices, self._num_classes, dtype=self._dtype)
+    
+    def entropy(self):
+        return self._dist.entropy()
 
 
 class TanhBijector(tfp.bijectors.Bijector):

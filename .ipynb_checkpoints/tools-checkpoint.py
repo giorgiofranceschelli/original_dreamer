@@ -10,8 +10,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.compat.v1 as tf1
 import tensorflow_probability as tfp
-from tensorflow.python.keras.mixed_precision.policy import global_policy
-from tensorflow.keras.mixed_precision import LossScaleOptimizer
+from tensorflow.keras.mixed_precision import global_policy, LossScaleOptimizer
 from tensorflow_probability import distributions as tfd
 
 
@@ -90,7 +89,7 @@ def encode_gif(frames, fps):
         f'-r {fps:.02f} -f gif -'])
     proc = Popen(cmd.split(' '), stdin=PIPE, stdout=PIPE, stderr=PIPE)
     for image in frames:
-        proc.stdin.write(image.tostring())
+        proc.stdin.write(image.tobytes())
     out, err = proc.communicate()
     if proc.returncode:
         raise IOError('\n'.join([' '.join(cmd), err.decode('utf8')]))
@@ -102,7 +101,7 @@ def simulate(agent, envs, steps=0, episodes=0, state=None):
     # Initialize or unpack simulation state.
     if state is None:
         step, episode = 0, 0
-        done = np.ones(len(envs), np.bool)
+        done = np.ones(len(envs), bool)
         length = np.zeros(len(envs), np.int32)
         obs = [None] * len(envs)
         agent_state = None
@@ -177,7 +176,7 @@ def load_episodes(directory, rescan, length=None, balance=False, seed=0):
                 total = len(next(iter(episode.values())))
                 available = total - length
                 if available < 1:
-                    print(f'Skipped short episode of length {available}.')
+                    # print(f'Skipped short episode of length {available}.')
                     continue
                 if balance:
                     index = min(random.randint(0, total), available)
@@ -286,6 +285,9 @@ class OneHotDist:
 
     def _one_hot(self, indices):
         return tf.one_hot(indices, self._num_classes, dtype=self._dtype)
+    
+    def entropy(self):
+        return self._dist.entropy()
 
 
 class TanhBijector(tfp.bijectors.Bijector):
