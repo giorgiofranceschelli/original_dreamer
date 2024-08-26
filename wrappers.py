@@ -5,8 +5,49 @@ import threading
 import traceback
 
 import gym
+from gym import wrappers
 import numpy as np
 from PIL import Image
+
+
+class Car:
+
+    def __init__(self, action_repeat=1, size=(64, 64)):
+        import gym
+        self._env = wrappers.ResizeObservation(gym.make("CarRacing-v2", continuous=False), shape=size[0])
+        self._action_repeat = action_repeat
+        self._size = size
+        self._lives = None
+        self._shape = self._env.observation_space.shape
+        self._random = np.random.RandomState(seed=None)
+
+    @property
+    def observation_space(self):
+        shape = self._shape
+        space = gym.spaces.Box(low=0, high=255, shape=shape, dtype=np.uint8)
+        return gym.spaces.Dict({'image': space})
+
+    @property
+    def action_space(self):
+        return self._env.action_space
+
+    def close(self):
+        return self._env.close()
+
+    def reset(self):
+        return {'image': self._env.reset()}
+
+    def step(self, action):
+        total_reward = 0.0
+        for _ in range(self._action_repeat):
+            obs, reward, done, info = self._env.step(action)
+            total_reward += reward
+            if done:
+                break
+        return {'image': obs}, total_reward, done, info
+
+    def render(self, mode):
+        return self._env.render(mode)
 
 
 class ProcGen:

@@ -30,15 +30,15 @@ def define_config():
     # General.
     config.logdir = pathlib.Path('/public.hpc/giorgio.franceschelli/dreamer')
     config.seed = 0
-    config.steps = 5e6
-    config.eval_every = 1e4
-    config.log_every = 1e3
+    config.steps = 2.5e7
+    config.eval_every = 5e4
+    config.log_every = 5e4
     config.log_scalars = True
     config.log_images = True
     config.gpu_growth = True
     config.precision = 16
     # Environment.
-    config.task = 'procgen_coinrun'
+    config.task = 'car'
     config.envs = 1
     config.parallel = 'none'
     config.action_repeat = 1
@@ -54,18 +54,18 @@ def define_config():
     config.dense_act = 'elu'
     config.cnn_act = 'relu'
     config.cnn_depth = 32
-    config.pcont = False
+    config.pcont = True
     config.free_nats = 3.0
     config.kl_scale = 1.0
     config.pcont_scale = 10.0
     config.weight_decay = 0.0
     config.weight_decay_pattern = r'.*'
     # Training.
-    config.batch_size = 50
-    config.batch_length = 50
+    config.batch_size = 100
+    config.batch_length = 25
     config.train_every = 1000
-    config.train_steps = 100
-    config.pretrain = 100
+    config.train_steps = 20
+    config.pretrain = 20
     config.model_lr = 6e-4
     config.value_lr = 8e-5
     config.actor_lr = 8e-5
@@ -75,7 +75,7 @@ def define_config():
     # Behavior.
     config.discount = 0.99
     config.disclam = 0.95
-    config.horizon = 15
+    config.horizon = 16
     config.action_dist = 'onehot'
     config.action_init_std = 5.0
     config.expl = 'additive_gaussian'
@@ -371,6 +371,9 @@ def make_env(config, writer, prefix, datadir, store):
         env = wrappers.OneHotAction(env)
     elif suite == 'procgen':
         env = wrappers.ProcGen(task, config.action_repeat, num_levels=200 if prefix == 'train' else 0, distribution_mode=config.mode, seed=config.seed)
+        env = wrappers.OneHotAction(env)
+    elif suite == 'car':
+        env = wrappers.Car(config.action_repeat, (64, 64))
         env = wrappers.OneHotAction(env)
     else:
         raise NotImplementedError(suite)
